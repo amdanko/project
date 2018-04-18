@@ -1,0 +1,31 @@
+augument:
+  cval: 0
+  data_format: channels_last
+  fill_mode: constant
+  height_shift_range: 0.05
+  horizontal_flip: true
+  rotation_range: 15
+  shear_range: 0.15
+  width_shift_range: 0.05
+  zoom_range: 0.015
+file:
+  img: data/orig/no_SNL_img.npy
+  label: data/orig/no_SNL_label.npy
+  leaveOut: SNL
+  name: p128_s050_n5
+  out: data/patch/
+model:
+  architecture: vanilla_unet
+  dropout: 0
+  early_stopping: true
+  epoch: 100
+  monitor: val_dice_coef
+  name: vanilla_unet_d00_p128_s050_n5
+  path: result/vanilla_unet
+  patience: 15
+patch:
+  norm: true
+  num: 5
+  rgb: true
+  scale: 0.5
+  size: 128
