@@ -14,7 +14,19 @@ from keras.layers import UpSampling2D, Dropout
 from keras.layers.noise import GaussianNoise
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from keras.activations import softmax 
+from keras.activations import softmax
+
+
+'''
+This module contains all the keras related functions,
+as well as two training metrics
+
+p.s. I apologize for the module name
+
+'''
+
+
+
 
 def dice_coef(y_true, y_pred,smooth=1):
     ''' Metric used for CNN training'''
@@ -34,7 +46,7 @@ def dice_coef_loss(y_true, y_pred):
 
 def vanilla_unet(patch_size = (None,None),learning_rate = 1e-5,dropout=0):
     ''' Get U-Net model with gaussian noise and dropout'''
-    
+
     inputs = Input((patch_size[0], patch_size[1],3))
 
     conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
@@ -179,7 +191,7 @@ def dil_unet(patch_size = (None,None),learning_rate = 1e-5,dropout=0):
 #    DROP
     conv5 = Conv2D(512, (3, 3), activation='relu', padding='same',dilation_rate=4)(conv5)
 #    DROP
-    
+
     up6 = concatenate([UpSampling2D(size=(2, 2))(conv5), conv4],axis=-1)
     up6 = Dropout(dropout)(up6)
     conv6 = Conv2D(256, (3, 3), activation='relu', padding='same')(up6)
@@ -216,21 +228,30 @@ def train_seg(train_patch, train_label, val_patch, val_label, img_gen,
               model, model_path, model_name="cool_name", epochs=100,
               early_stop=1, monitor='val_dice_coef',patience=15):
 
-    
+    ''' This just runs the keras training 'generator' and also sets up the logging
+    '''
+
+    # This is a keras callback that will stop the training if the model doesn't
+    # improve after a certain point
     earlyStopping = EarlyStopping(monitor=monitor, patience=patience,
                                                verbose=1, mode='max')
 
+   # this saves the weights to the hdf5 file -- this is basically our 'model' file
+   # this is set to only save the BEST weights
     checkpoint = ModelCheckpoint(os.path.join(model_path,model_name+'.hdf5'), mode = 'max', monitor=monitor,
                                  verbose=1, save_best_only=True, save_weights_only = True)
 
-    if (early_stop): 
+
+    if (early_stop):
         callback= [checkpoint,earlyStopping]
     else:
         callback=checkpoint
 
+
     training_time = time.time()
-    
-        # if i am augumenting it on the fly then can i just make..however many steps i want... ? 
+
+
+    # This is the training generator !
     HERE_WE_GO_FOLKS = model.fit_generator(img_gen,
                      epochs=epochs,
                      steps_per_epoch= train_patch.shape[0] / 32,
@@ -239,7 +260,8 @@ def train_seg(train_patch, train_label, val_patch, val_label, img_gen,
                      callbacks=callback)
 
     training_time= time.time() - training_time
-    
+
+   # here we send the validation score for each epoch to a file
     monitor_history =  np.array(HERE_WE_GO_FOLKS.history[monitor])
     np.save(os.path.join(model_path,model_name+"_"+monitor+'.npy'),monitor_history )
 
@@ -248,19 +270,21 @@ def train_seg(train_patch, train_label, val_patch, val_label, img_gen,
     run_dict= {'score':score,
                'time': training_time,
                'system': os.uname()[1]}
-    
+
     return run_dict
 
 
 
 def seg_img(model, test_img,mean,std, period=16):
-    
+    ''' load a model and try to segment a new image with it '''
+    # prepare the image
     img_rgb = rgb_images(test_img,period)
     img_rgb = 100.0*(img_rgb-img_rgb.min(axis=(1,2),keepdims = True))/(img_rgb.max(axis=(1,2),keepdims = True)
                                                                        -img_rgb.min(axis=(1,2),keepdims = True))
     img_rgb-=mean
     img_rgb/=std
     img_rgb,nw,nz  = pad_images(img_rgb)
+
 
     print "Segmenting test image..."
     predict = model.predict(img_rgb)
