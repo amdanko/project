@@ -94,7 +94,10 @@ def make_log(img_obj,train_obj,**run_dict):
     print log_dict
     return
 
-def make_predict(img_obj,train_obj,test_img):
+
+
+
+def make_predict_OG(img_obj,train_obj,test_img):
     print "Loading trained model..."
     test_model=os.path.join(train_obj.model_path,train_obj.model_name+".hdf5")
     mean_t, std_t = np.load(os.path.join(img_obj.out_path,img_obj.out_name+"_meanstd.npy"))
@@ -114,8 +117,9 @@ def make_predict(img_obj,train_obj,test_img):
 
     print "Loading test image..."
 
+    img, label = load_predict_data(img_path=img_obj.img_path, label_path=img_obj.label_path,
+                               leaveOut=img_obj.leaveOut)
         
-    img = np.load(test_img)
     print "Trying to segment..."
     predict = seg_img(model,img,mean_t,std_t)
     #predicted_imgs.append(predict)
@@ -124,6 +128,45 @@ def make_predict(img_obj,train_obj,test_img):
     np.save(os.path.join(train_obj.model_path,train_obj.model_name+".npy"),predict)
 
     return
+
+
+def make_predict(img_obj,train_obj,test_img):
+
+    #LOAD TESTING IMG 
+    print "Loading test image..."
+
+    img, label,names = load_predict_data(img_path=img_obj.img_path, label_path=img_obj.label_path,
+                               leaveOut=img_obj.leaveOut)
+        
+    # THEN LOAD MODEL 
+    
+    print "Loading trained model..."
+    test_model=os.path.join(train_obj.model_path,train_obj.model_name+".hdf5")
+    mean_t, std_t = np.load(os.path.join(img_obj.out_path,img_obj.out_name+"_meanstd.npy"))
+    
+    if train_obj.model_arch=="vanilla_unet":
+        model = vanilla_unet()
+        model.load_weights(test_model)
+    elif train_obj.model_arch=="rob_unet":
+        model = rob_unet()
+        model.load_weights(test_model)
+    elif train_obj.model_arch=="dil_unet":
+        model=dil_unet()
+        model.load_weights(test_model)
+    else:
+        print "you didn't chose one of the possible model architecutres: "
+        print "- vanilla_unet \n -rob_unet \n dil_unet"
+        
+    print "Trying to segment..."
+        
+    predict = seg_img(img,label,names,model,mean_t,std_t)    
+    #predicted_imgs.append(predict)
+    print "Saving Segmentation Result..."
+    
+    np.save(os.path.join(train_obj.model_path,train_obj.model_name+".npy"),predict)
+
+    return
+
 
 
 

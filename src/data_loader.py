@@ -300,3 +300,69 @@ def load_patch(patch_path,patch_name,shuffle=1, val_perc=0.2, resize=1,save=1):
                  
     return train_img,train_label,val_img,val_label
                           
+
+    
+
+def load_predict_data(img_path, label_patch, leaveOut=None,save=1,period=16):
+    '''
+    Generate predicted patches and compare with ground truth '''
+    img_files = np.array(os.listdir(img_path))
+    label_files = np.array(os.listdir(label_path))
+
+
+    # load ones originally kicked out 
+    img_files=[v for i, v in enumerate(img_files) if leaveOut in v]
+    label_files=[v for i, v in enumerate(label_files) if leaveOut in v]
+
+    #next two temp
+    img_files=[v for i, v in enumerate(img_files) if ".npy" not in v]
+    label_files=[v for i, v in enumerate(label_files) if ".npy" not in v]
+
+    img_names = [img.split(".nii.gz")[0] for img in img_files]
+
+    # make sure there is nothing sneaky in there
+    assert len(img_files)==len(label_files), "You have an unequal amount of images and labels!"
+
+
+    imgs = np.zeros((1,256,252,3))
+    labels = np.zeros((1,256,252,1))
+
+
+    # go thru the images and actually load em in
+
+    for (ii,jj) in zip(sorted(img_files),sorted(label_files)):
+        aux_imgs = nib.load(os.path.join(img_path,ii)).get_data()
+        aux_labels = nib.load(os.path.join(label_path,jj)).get_data()#[:,:,:,np.newaxis]
+
+        # this is only because there are 2 imgs
+        # in my data that are rotated
+        if aux_imgs.shape[0] == 252:
+            aux_imgs= np.swapaxes(aux_imgs,0,1)
+        if aux_labels.shape[0] == 252:
+            aux_labels= np.swapaxes(aux_labels,0,1)
+
+        # tranpose 'em into the form we want: n,h,w
+        aux_imgs=np.transpose(aux_imgs, [2,0,1])
+        aux_labels=np.transpose(aux_labels, [2,0,1])
+
+        #create 'time-rgb' images (rgb_images funct from post-doc)
+        aux_imgs= rgb_images(aux_imgs,period)
+        aux_labels=aux_labels[:,:,:,np.newaxis]
+
+        imgs = np.concatenate((imgs,aux_imgs),axis = 0)
+        labels = np.concatenate((labels,aux_labels),axis = 0)
+
+
+    # beacuse we initialized it up there
+    imgs = imgs[1:,:,:,:]
+    labels = labels[1:,:,:,:]
+
+    #Save the npy file for future use..
+    # maybe set out_path = img_path by default ? for this
+    if (save):
+        timestamp = str(int(time.time()))
+        np.save(os.path.join(img_path,leaveOut+"_img.npy"), imgs)
+        np.save(os.path.join(label_path,leaveOut+"_label.npy"), labels)
+
+
+    return imgs,labels, img_names

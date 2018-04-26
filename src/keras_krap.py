@@ -1,6 +1,7 @@
 import os
 import time
 import numpy as np
+import pandas as pd
 import keras
 from keras import backend as K
 from rob import rgb_images, pad_images
@@ -22,6 +23,15 @@ def dice_coef(y_true, y_pred,smooth=1):
     y_pred_f = K.flatten(y_pred)
     intersection = K.sum(y_true_f * y_pred_f)
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+
+
+
+def dice_img(y_true, y_pred,smooth=1):
+    ''' Dice for test data'''
+    y_true_f = y_true.ravel()
+    y_pred_f = y_pred.ravel()
+    intersection = sum(y_true_f * y_pred_f)
+    return (2. * intersection + smooth) / (sum(y_true_f) + sum(y_pred_f) + smooth)
 
 
 
@@ -253,17 +263,32 @@ def train_seg(train_patch, train_label, val_patch, val_label, img_gen,
 
 
 
-def seg_img(model, test_img,mean,std, period=16):
+def seg_img(test_img, test_label,img_names,model,mean,std, period=16,save=0):
+    # already rgb ! 
     
-    img_rgb = rgb_images(test_img,period)
-    img_rgb = 100.0*(img_rgb-img_rgb.min(axis=(1,2),keepdims = True))/(img_rgb.max(axis=(1,2),keepdims = True)
+    test_dice = pd.DataFrame(columns=["model","dice"])
+    # add labels, save
+    # use middle slice
+    for i in range(test_img.shape[0]//period):
+        
+        img_range =range(i*period,i*period+period)
+        img_rgb = test_img[img_range,:,:,:]
+        img_rgb = 100.0*(img_rgb-img_rgb.min(axis=(1,2),keepdims = True))/(img_rgb.max(axis=(1,2),keepdims = True)
                                                                        -img_rgb.min(axis=(1,2),keepdims = True))
-    img_rgb-=mean
-    img_rgb/=std
-    img_rgb,nw,nz  = pad_images(img_rgb)
+ 
+        img_rgb-=mean
+        img_rgb/=std
+        img_rgb,nw,nz  = pad_images(img_rgb)
 
-    print "Segmenting test image..."
-    predict = model.predict(img_rgb)
-    predict = predict[:,:-nw,:-nz,0]
+        print "Segmenting test image..."
+        predict = model.predict(img_rgb)
+        predict = predict[:,:-nw,:-nz,0]
+        dice = dice_img(test_label[img_range,:,:], predict)
+        dicey = pd.DataFrame(dict(model=img_names[i],dice=dice),index=[0])
+        test_dice = test_dice.append(dicey)
+        
+    if (save):    
+        np.save(os.path.join(train_obj.model_path,train_obj.model_name+".npy"),predict)
+    
 
-    return predict
+    return predict,test_dice
